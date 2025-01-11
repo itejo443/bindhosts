@@ -10,6 +10,62 @@ versionCode=$(grep versionCode $MODPATH/module.prop | sed 's/versionCode=//g' )
 echo "[+] bindhosts v$versionCode "
 echo "[%] customize.sh "
 
+# Install App Section
+# Prompt user to press a key
+echo "[?] Press Volume Up to install the bindhosts-tile app, or Volume Down to skip."
+
+# Set default sleep time to 4 seconds
+sleep_time=4
+
+# Function to detect key press
+detect_key_press() {
+    echo "[+] Waiting for key press (Volume Up or Volume Down)..."
+    while read -r line; do
+        if echo "$line" | grep -q "KEY_VOLUMEUP"; then
+            echo "[+] Volume Up detected. Proceeding with installation..."
+            return 1
+        elif echo "$line" | grep -q "KEY_VOLUMEDOWN"; then
+            echo "[+] Volume Down detected. Skipping installation..."
+            return 0
+        fi
+    done < <(getevent -ql)  # Stream getevent output to the loop
+}
+
+# Call the function and check the result
+if detect_key_press; then
+    action="skip"
+else
+    action="install"
+fi
+
+# Perform actions based on key detection
+if [ "$action" = "install" ]; then
+    APK_PATH=$MODPATH/common/app-release.apk  # Path to your APK file
+
+    echo "[%] Checking for APK at $APK_PATH..."
+    if [ -f "$APK_PATH" ]; then
+        echo "[+] APK found, installing as user app..."
+        pm install -r "$APK_PATH" >/dev/null 2>&1
+
+        if [ $? -eq 0 ]; then
+            echo "[+] App installed successfully!"
+            echo "[+] Enable root permission!"
+            echo "[+] Enable Capabilities (KernelSU): dac_override | net_bind_service | net_raw"
+        else
+            echo "[!] Failed to install the app."
+        fi
+    else
+        echo "[!] APK not found at $APK_PATH. Skipping installation."
+    fi
+else
+    echo "[+] Skipping installation as per user choice."
+fi
+
+# Override sleep time as per key press (0 if Volume Down is pressed)
+sleep $sleep_time  # Sleep for 0 or 4 seconds based on key press
+
+# Continue with other operations below...
+
 # persistence
 [ ! -d $PERSISTENT_DIR ] && mkdir -p $PERSISTENT_DIR
 # make our hosts file dir

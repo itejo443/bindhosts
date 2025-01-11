@@ -8,6 +8,7 @@ on:
       - '.github/workflows/release.yml'
       - 'module/**'
       - 'update.json'
+      - 'tileapp/**'
   workflow_dispatch:
 
 jobs:
@@ -44,6 +45,51 @@ jobs:
           echo "version_changed=false" >> $GITHUB_ENV
           echo "ZIP_NAME=bindhosts_$CURRENT_VERSION_CODE-$COMMIT_ID" >> $GITHUB_ENV
         fi
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Write key
+      if: ${{ (github.event_name != 'pull_request' && github.ref == 'refs/heads/master') || github.ref_type == 'tag' }}
+      run: |
+        if [ ! -z "${{ secrets.KEYSTORE }}" ]; then
+          {
+            echo KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+            echo KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+            echo KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+            echo KEYSTORE_FILE='key.jks'
+          } >> gradle.properties
+          echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+        fi
+        echo "KEYSTORE_FILE=$(pwd)/key.jks" >> $GITHUB_ENV
+        echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+        echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+        echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+
+    - name: Build the Android app
+      run: |
+        cd tileapp/
+        ./gradlew clean assembleRelease
+
+    - name: Copy app-release.apk to /module/common/
+      run: |
+        cp tileapp/app/build/outputs/apk/release/app-release.apk ./module/common/app-release.apk
+        echo "app-release.apk copied to /module/common/"
+
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk
+        path: tileapp/app/build/outputs/apk/release/app-release.apk
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
