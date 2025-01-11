@@ -10,6 +10,41 @@ versionCode=$(grep versionCode $MODPATH/module.prop | sed 's/versionCode=//g' )
 echo "[+] bindhosts v$versionCode "
 echo "[%] customize.sh "
 
+# Install App Section
+# Prompt user to press a key
+echo "[?] Press Volume Up to install the bindhosts-tile app, or Volume Down to skip."
+
+chooseport
+
+# Delay for 4 seconds to allow the user to press a key
+sleep 4
+
+if [ "$?" == "0" ]; then
+    # User pressed Volume Up
+    APK_PATH=$MODPATH/common/app-release.apk  # Path to your APK file
+
+    echo "[%] Checking for APK at $APK_PATH..."
+    if [ -f "$APK_PATH" ]; then
+        echo "[+] APK found, installing as user app..."
+        pm install -r "$APK_PATH" >/dev/null 2>&1
+
+        if [ $? -eq 0 ]; then
+            echo "[+] App installed successfully!"
+            echo "[+] Enable root permission!"
+            echo "[+] Enable Capabilities (KernelSU) : dac_override | net_bind_service | net_raw"
+        else
+            echo "[!] Failed to install the app."
+        fi
+    else
+        echo "[!] APK not found at $APK_PATH. Skipping installation."
+    fi
+else
+    # User pressed Volume Down
+    echo "[!] Skipping app installation."
+fi
+
+# Continue with other operations below...
+
 # persistence
 [ ! -d $PERSISTENT_DIR ] && mkdir -p $PERSISTENT_DIR
 # make our hosts file dir

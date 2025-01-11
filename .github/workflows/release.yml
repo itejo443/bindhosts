@@ -8,6 +8,7 @@ on:
       - '.github/workflows/release.yml'
       - 'module/**'
       - 'update.json'
+      - 'tileapp/**'
   workflow_dispatch:
 
 jobs:
@@ -45,7 +46,44 @@ jobs:
           echo "ZIP_NAME=bindhosts_$CURRENT_VERSION_CODE-$COMMIT_ID" >> $GITHUB_ENV
         fi
 
-    - name: Upload artifact
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Write keystore details
+      run: |
+        echo "KEYSTORE_FILE=key.jks" >> $GITHUB_ENV
+        echo "KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}" >> $GITHUB_ENV
+        echo "KEY_ALIAS=${{ secrets.KEY_ALIAS }}" >> $GITHUB_ENV
+        echo "KEY_PASSWORD=${{ secrets.KEY_PASSWORD }}" >> $GITHUB_ENV
+        echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+        echo "KEYSTORE_FILE=$(pwd)/key.jks" >> $GITHUB_ENV
+
+    - name: Build the Android app
+      run: |
+        cd tileapp/
+        ./gradlew clean assembleRelease
+
+    - name: Copy app-release.apk to /module/common/
+      run: |
+        cp tileapp/app/build/outputs/apk/release/app-release.apk ./module/common/app-release.apk
+        echo "app-release.apk copied to /module/common/"
+
+    - name: Upload APK as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-apk
+        path: tileapp/app/build/outputs/apk/release/app-release.apk
+
+    - name: Upload additional module files
       uses: actions/upload-artifact@v4
       with:
         name: ${{ env.ZIP_NAME }}
